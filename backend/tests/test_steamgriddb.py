@@ -23,6 +23,17 @@ def rich_handler(request: httpx.Request) -> httpx.Response:
         assert "Authorization" not in request.headers
         return httpx.Response(200, content=b"img-bytes")
     assert request.headers["Authorization"] == "Bearer TEST-KEY"
+    mimes = request.url.params.get("mimes", "")
+    if "/icons/" in path:
+        # regression guard: icons reject image/webp with HTTP 400 "Invalid mime type"
+        assert "webp" not in mimes and set(mimes.split(",")) <= {
+            "image/png",
+            "image/x-icon",
+            "image/vnd.microsoft.icon",
+        }, mimes
+    if "/logos/" in path:
+        # regression guard: logos reject image/svg+xml with HTTP 400
+        assert "svg" not in mimes and set(mimes.split(",")) <= {"image/png", "image/webp"}, mimes
     if path.endswith("/search/autocomplete/portal"):
         return httpx.Response(200, json={"success": True, "data": [{"id": 123, "name": "Portal 2"}]})
     if path.endswith("/game/steam/620"):
@@ -92,5 +103,6 @@ def test_ext_from():
     assert _ext_from("image/jpeg", None) == ".jpg"
     assert _ext_from("image/svg+xml", None) == ".svg"
     assert _ext_from("image/x-icon", None) == ".ico"
+    assert _ext_from("image/vnd.microsoft.icon", None) == ".ico"
     assert _ext_from(None, "https://cdn/x/y.webp?dl=1") == ".webp"
     assert _ext_from(None, None) == ".png"

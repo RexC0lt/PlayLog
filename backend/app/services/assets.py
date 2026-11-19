@@ -14,15 +14,21 @@ from .steamgriddb import SteamGridDbClient, SteamGridDbError
 logger = logging.getLogger(__name__)
 
 
-def _pick(assets: list[dict], prefer_dims: tuple[str, ...] = ()) -> dict | None:
-    """Pick the best asset: preferred dimensions first, then highest score."""
+def _pick(
+    assets: list[dict],
+    prefer_dims: tuple[str, ...] = (),
+    prefer_mimes: tuple[str, ...] = ("image/png", "image/jpeg", "image/webp"),
+) -> dict | None:
+    """Pick the best asset: preferred dimensions/mimes first, then highest score."""
     if not assets:
         return None
 
     def key(a: dict):
         dims = f"{a.get('width')}x{a.get('height')}"
         dim_rank = prefer_dims.index(dims) if dims in prefer_dims else len(prefer_dims)
-        return (dim_rank, -(a.get("score") or 0))
+        mime = a.get("mime") or ""
+        mime_rank = prefer_mimes.index(mime) if mime in prefer_mimes else len(prefer_mimes)
+        return (dim_rank, mime_rank, -(a.get("score") or 0))
 
     return sorted(assets, key=key)[0]
 
@@ -36,10 +42,15 @@ async def _fetch_one(
     kind: str,
     overwrite: bool,
     result: dict,
+    prefer_mimes: tuple[str, ...] = ("image/png", "image/jpeg", "image/webp"),
 ) -> None:
     try:
         assets = await fetch_assets()
-        best = _pick(assets, prefer_dims=("600x900", "342x482") if kind == "grid" else ())
+        best = _pick(
+            assets,
+            prefer_dims=("600x900", "342x482") if kind == "grid" else (),
+            prefer_mimes=prefer_mimes,
+        )
         if best is None:
             return
         if not overwrite and getattr(game, attr):
@@ -77,7 +88,8 @@ async def fetch_game_assets(
             return result
         gid = int(sgdb_game["id"])
         await _fetch_one(game, "cover_filename", lambda: sgdb.get_grids(gid), sgdb.download, covers_dir, "grid", overwrite, result)
-        await _fetch_one(game, "icon_filename", lambda: sgdb.get_icons(gid), sgdb.download, covers_dir, "icon", overwrite, result)
+        # icons: prefer png over ico; logos: png/webp only
+        await _fetch_one(game, "icon_filename", lambda: sgdb.get_icons(gid), sgdb.download, covers_dir, "icon", overwrite, result, prefer_mimes=("image/png", "image/vnd.microsoft.icon", "image/x-icon"))
         await _fetch_one(game, "logo_filename", lambda: sgdb.get_logos(gid), sgdb.download, covers_dir, "logo", overwrite, result)
     except Exception as exc:  # noqa: BLE001 - asset fetching must never break anything
         logger.warning("SteamGridDB asset fetch failed for %r: %s", game.title, exc)

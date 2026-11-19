@@ -30,7 +30,7 @@ def _ext_from(mime: str | None, url: str | None) -> str:
             return ".jpg"
         if sub == "svg+xml":
             return ".svg"
-        if sub == "x-icon":
+        if sub in ("x-icon", "vnd.microsoft.icon"):
             return ".ico"
         if sub and sub.isalnum():
             return f".{sub}"
@@ -92,16 +92,20 @@ class SteamGridDbClient:
         return _unwrap(payload, "grids")
 
     async def get_icons(self, game_id: int) -> list[dict]:
+        # NOTE: the icons endpoint only accepts image/png, image/x-icon and
+        # image/vnd.microsoft.icon as mimes (webp is rejected with HTTP 400).
         payload = await self._get(
             f"/icons/game/{game_id}",
-            params={"mimes": "image/png,image/webp", "types": "static,animated"},
+            params={"mimes": "image/png,image/x-icon,image/vnd.microsoft.icon", "types": "static"},
         )
         return _unwrap(payload, "icons")
 
     async def get_logos(self, game_id: int) -> list[dict]:
+        # NOTE: the logos endpoint only accepts image/png and image/webp
+        # (svg is rejected with HTTP 400).
         payload = await self._get(
             f"/logos/game/{game_id}",
-            params={"mimes": "image/png,image/svg+xml,image/webp", "types": "static,animated"},
+            params={"mimes": "image/png,image/webp", "types": "static,animated"},
         )
         return _unwrap(payload, "logos")
 
