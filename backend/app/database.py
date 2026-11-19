@@ -1,0 +1,52 @@
+"""Async SQLAlchemy engine/session setup and the FastAPI `get_db` dependency."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from fastapi import Request
+from sqlalchemy import DateTime
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.types import TypeDecorator
+
+
+class Base(DeclarativeBase):
+    """Declarative base for all models."""
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class UTCDateTime(TypeDecorator):
+    """Stores datetimes as naive UTC in SQLite, always returns timezone-aware UTC."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):  # noqa: ANN001
+        if value is None:
+            return None
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):  # noqa: ANN001
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc)
+
+
+def make_engine(settings) -> AsyncEngine:  # noqa: ANN001
+    return create_async_engine(settings.database_url, echo=False, future=True)
+
+
+def make_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, expire_on_commit=False)
+
+
+async def get_db(request: Request):
+    """FastAPI dependency yielding an AsyncSession bound to the app's session factory."""
+    async with request.app.state.session_factory() as session:
+        yield session
