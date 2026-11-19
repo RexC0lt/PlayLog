@@ -82,6 +82,19 @@ async def test_search_lookup_assets_and_download(tmp_path):
     assert await client.download(grids[1]["url"], tmp_path, "sgdb_grid_2", grids[1]["mime"]) == fn
 
 
+async def test_search_term_is_fully_url_encoded():
+    """Slashes/colons in titles must be percent-encoded or the route 404s."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["raw_path"] = request.url.raw_path.decode()
+        return httpx.Response(200, json={"success": True, "data": []})
+
+    client = make_client(handler)
+    await client.search_games("Rising Storm/Red Orchestra 2: Multiplayer")
+    assert seen["raw_path"] == "/api/v2/search/autocomplete/Rising%20Storm%2FRed%20Orchestra%202%3A%20Multiplayer"
+
+
 async def test_unknown_steam_appid_returns_none():
     client = make_client(rich_handler)  # everything 404s except known paths
     assert await client.find_game_by_steam_appid("999999") is None

@@ -10,6 +10,7 @@ reported through the API/UI.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -40,15 +41,23 @@ class SyncOutcome:
 async def _record_status(
     db: AsyncSession, storefront: str, success: bool, items_synced: int, error: str | None
 ) -> None:
-    row = await db.scalar(select(SyncStatus).where(SyncStatus.storefront == storefront))
-    if row is None:
-        row = SyncStatus(storefront=storefront)
-        db.add(row)
-    row.last_run_at = utcnow()
-    row.success = success
-    row.error = error
-    row.items_synced = items_synced
-    await db.commit()
+    """Persist the sync outcome. Never raises — a failed status write must not 500 the API."""
+    try:
+        row = await db.scalar(select(SyncStatus).where(SyncStatus.storefront == storefront))
+        if row is None:
+            row = SyncStatus(storefront=storefront)
+            db.add(row)
+        row.last_run_at = utcnow()
+        row.success = success
+        row.error = error
+        row.items_synced = items_synced
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to record sync status for %s", storefront)
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 async def _apply_igdb_detail(db: AsyncSession, game: Game, igdb, covers_dir: Path, overwrite: bool) -> None:
@@ -214,6 +223,11 @@ async def _upsert_ownership(
     return ownership
 
 
+# Serializes syncs within this process so the scheduler job and a manual
+# POST /api/sync/steam never write to SQLite concurrently.
+_SYNC_LOCK = asyncio.Lock()
+
+
 async def sync_storefront(
     db: AsyncSession,
     adapter: StorefrontAdapter,
@@ -222,6 +236,17 @@ async def sync_storefront(
     sgdb=None,
 ) -> SyncOutcome:
     """Sync one storefront. Never raises: failures are recorded in sync_status."""
+    async with _SYNC_LOCK:
+        return await _sync_storefront_locked(db, adapter, igdb, covers_dir, sgdb)
+
+
+async def _sync_storefront_locked(
+    db: AsyncSession,
+    adapter: StorefrontAdapter,
+    igdb,
+    covers_dir: Path,
+    sgdb=None,
+) -> SyncOutcome:
     name = adapter.name
     try:
         library = await adapter.fetch_library()
@@ -250,6 +275,10 @@ async def sync_storefront(
                 steam_appid = item.product_id if adapter.name == "steam" else None
                 await fetch_game_assets(game, sgdb, covers_dir, steam_appid=steam_appid, overwrite=False)
             count += 1
+            if count % 20 == 0:
+                # commit in chunks so the SQLite write lock is not held for the
+                # whole sync (lets concurrent short writes, e.g. PATCH, through)
+                await db.commit()
         await db.commit()
     except Exception as exc:  # noqa: BLE001
         await db.rollback()

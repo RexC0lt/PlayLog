@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import Request
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, event
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.types import TypeDecorator
@@ -39,7 +39,19 @@ class UTCDateTime(TypeDecorator):
 
 
 def make_engine(settings) -> AsyncEngine:  # noqa: ANN001
-    return create_async_engine(settings.database_url, echo=False, future=True)
+    engine = create_async_engine(settings.database_url, echo=False, future=True)
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragmas(dbapi_connection, connection_record):  # noqa: ANN001
+        # WAL lets readers proceed while a writer commits; busy_timeout makes
+        # concurrent writers wait instead of failing with "database is locked".
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=60000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    return engine
 
 
 # Columns added after the initial release; applied to pre-existing databases.

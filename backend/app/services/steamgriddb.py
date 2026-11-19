@@ -74,7 +74,8 @@ class SteamGridDbClient:
         return data if isinstance(data, dict) else None
 
     async def search_games(self, term: str, limit: int = 10) -> list[dict]:
-        payload = await self._get(f"/search/autocomplete/{quote(term)}")
+        # safe="" so slashes in titles are percent-encoded (a raw "/" would 404 the route)
+        payload = await self._get(f"/search/autocomplete/{quote(term, safe='')}")
         return _unwrap(payload, "search")[:limit]
 
     async def get_grids(self, game_id: int) -> list[dict]:

@@ -240,4 +240,6 @@ mocked IGDB via dependency overrides and `httpx.MockTransport`, persistence acro
 
 Everything that matters lives in the bind-mounted `./data/` directory
 (`playlog.db` + `covers/`). Point your existing OMV backup job at that folder — no
-database service to dump, no external state.
+database service to dump, no external state. The database runs in WAL mode with a
+60 s busy timeout, and syncs are serialized in-process, so the scheduled sync and
+manual actions (sync button, art refresh, edits) can safely overlap.
