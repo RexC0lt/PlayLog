@@ -145,6 +145,7 @@ All `/api/*` routes except `POST /api/auth/login` require a session (cookie or
 
 | Method & path | Description |
 |---|---|
+| `GET /api/health` | public liveness probe (container healthcheck; no auth) |
 | `POST /api/auth/login` | `{password}` → session token (also set as cookie) |
 | `POST /api/auth/logout`, `GET /api/auth/me` | session management |
 | `GET /api/games?search=&storefront=&status=&tag=` | list games with aggregates |

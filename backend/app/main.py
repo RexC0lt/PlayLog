@@ -97,6 +97,11 @@ def create_app(settings: Settings | None = None, *, enable_scheduler: bool = Tru
     for router in (games_router.router, sync_router.router, igdb_router.router, library_router.router):
         app.include_router(router, dependencies=[Depends(require_auth)])
 
+    @app.get("/api/health", include_in_schema=False)
+    async def health():
+        """Public liveness probe (used by the container healthcheck; no auth, no log noise)."""
+        return {"status": "ok"}
+
     dist = _frontend_dist(settings)
 
     @app.get("/{full_path:path}", include_in_schema=False)

@@ -28,6 +28,11 @@ from tests.conftest import TEST_PASSWORD
 # ---------------------------------------------------------------- auth
 
 
+async def test_health_endpoint_is_public(client):
+    resp = await client.get("/api/health")
+    assert resp.status_code == 200 and resp.json() == {"status": "ok"}
+
+
 async def test_api_requires_auth(client):
     assert (await client.get("/api/games")).status_code == 401
     assert (await client.get("/api/sync/status")).status_code == 401
