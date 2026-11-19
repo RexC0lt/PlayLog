@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import select  # noqa: F401  (used in refresh_assets)
 
 from ..database import get_db, utcnow
-from ..deps import get_igdb_client
-from ..models import Game, Ownership, PlaySession, get_or_create_storefront
+from ..deps import get_igdb_client, get_sgdb_client
+from ..models import Game, Ownership, PlaySession, Storefront, get_or_create_storefront
 from ..schemas import (
     GameCreate,
     GameOut,
@@ -17,6 +17,7 @@ from ..schemas import (
     SessionOut,
     list_to_csv,
 )
+from ..services.assets import fetch_game_assets
 from ..services.covers import cache_cover, cover_file
 from ..services.igdb import game_fields
 from ..services.library import build_game_outs, load_games
@@ -42,6 +43,7 @@ async def create_game(
     request: Request,
     db=Depends(get_db),
     igdb=Depends(get_igdb_client),
+    sgdb=Depends(get_sgdb_client),
 ):
     """Manual entry. When igdb_id is given, enrich metadata + cover from IGDB."""
     settings = request.app.state.settings
@@ -69,6 +71,9 @@ async def create_game(
                             game.cover_filename = filename
             except Exception:
                 pass  # IGDB enrichment is best-effort; the manual entry still works
+    if sgdb is not None and (not game.cover_filename or not game.icon_filename or not game.logo_filename):
+        # best-effort SteamGridDB art (fills only what is missing)
+        await fetch_game_assets(game, sgdb, settings.covers_dir, steam_appid=None, overwrite=False)
     db.add(game)
     await db.flush()
     manual = await get_or_create_storefront(db, "manual")
@@ -107,16 +112,73 @@ async def patch_game(game_id: int, payload: GamePatch, db=Depends(get_db)):
     return (await build_game_outs(db, [game]))[0]
 
 
-@router.get("/{game_id}/cover")
-async def get_cover(game_id: int, request: Request, db=Depends(get_db)):
-    """Serve the locally cached cover image (downloaded once at sync/add time)."""
+def _media_type(path) -> str:  # noqa: ANN001
+    return {
+        ".png": "image/png",
+        ".svg": "image/svg+xml",
+        ".ico": "image/x-icon",
+        ".webp": "image/webp",
+    }.get(path.suffix.lower(), "image/jpeg")
+
+
+async def _serve_asset(game_id: int, attr: str, request: Request, db) -> FileResponse:
     game = await db.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    path = cover_file(request.app.state.settings.covers_dir, game.cover_filename)
+    path = cover_file(request.app.state.settings.covers_dir, getattr(game, attr))
     if path is None:
-        raise HTTPException(status_code=404, detail="No cached cover for this game")
-    return FileResponse(path, media_type="image/jpeg")
+        raise HTTPException(status_code=404, detail=f"No cached {attr} for this game")
+    return FileResponse(path, media_type=_media_type(path))
+
+
+@router.get("/{game_id}/cover")
+async def get_cover(game_id: int, request: Request, db=Depends(get_db)):
+    """Serve the locally cached cover image (downloaded once at sync/add time)."""
+    return await _serve_asset(game_id, "cover_filename", request, db)
+
+
+@router.get("/{game_id}/icon")
+async def get_icon(game_id: int, request: Request, db=Depends(get_db)):
+    """Serve the locally cached SteamGridDB icon, if any."""
+    return await _serve_asset(game_id, "icon_filename", request, db)
+
+
+@router.get("/{game_id}/logo")
+async def get_logo(game_id: int, request: Request, db=Depends(get_db)):
+    """Serve the locally cached SteamGridDB logo, if any."""
+    return await _serve_asset(game_id, "logo_filename", request, db)
+
+
+@router.post("/{game_id}/assets/refresh", response_model=GameOut)
+async def refresh_assets(
+    game_id: int,
+    request: Request,
+    db=Depends(get_db),
+    sgdb=Depends(get_sgdb_client),
+):
+    """(Re)fetch cover/icon/logo from SteamGridDB for one game.
+
+    Matches by Steam appid when the game has a Steam ownership, else by title.
+    """
+    if sgdb is None:
+        raise HTTPException(
+            status_code=400,
+            detail="SteamGridDB is not configured: set STEAMGRIDDB_API_KEY (see README).",
+        )
+    game = await db.get(Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    row = await db.execute(
+        select(Ownership.store_product_id)
+        .join(Storefront, Storefront.id == Ownership.storefront_id)
+        .where(Ownership.game_id == game_id, Storefront.name == "steam")
+    )
+    steam_appid = row.scalar_one_or_none()
+    await fetch_game_assets(
+        game, sgdb, request.app.state.settings.covers_dir, steam_appid=steam_appid, overwrite=True
+    )
+    await db.commit()
+    return (await build_game_outs(db, [game]))[0]
 
 
 @router.get("/{game_id}/sessions", response_model=list[SessionOut])

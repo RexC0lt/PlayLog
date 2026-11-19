@@ -19,6 +19,10 @@ export interface Game {
   description: string | null
   cover_url: string | null
   cover_filename: string | null
+  icon_url: string | null
+  logo_url: string | null
+  icon_filename: string | null
+  logo_filename: string | null
   release_year: number | null
   genres: string[]
   status: BacklogStatus
@@ -87,4 +91,10 @@ export interface GameFilters {
   storefront: string
   status: string
   tag: string
+}
+
+export interface Meta {
+  steam_configured: boolean
+  igdb_configured: boolean
+  steamgriddb_configured: boolean
 }

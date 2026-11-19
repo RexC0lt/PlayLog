@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from ..database import get_db
 from ..schemas import RecentlyPlayedItem
 from ..services.library import build_game_outs, load_games
 
 router = APIRouter(prefix="/api", tags=["library"])
+
+
+@router.get("/meta")
+async def meta(request: Request):
+    """Which optional integrations are configured (drives UI affordances)."""
+    s = request.app.state.settings
+    return {
+        "steam_configured": s.steam_configured,
+        "igdb_configured": s.igdb_configured,
+        "steamgriddb_configured": s.steamgriddb_configured,
+    }
 
 
 @router.get("/recently-played", response_model=list[RecentlyPlayedItem])

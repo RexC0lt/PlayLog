@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from .auth.dependencies import require_auth
 from .auth.password import ensure_password_hash
 from .config import Settings, get_settings
-from .database import Base, get_db, make_engine, make_session_factory
+from .database import Base, get_db, make_engine, make_session_factory, migrate
 from .models import seed_storefronts
 from .routers import auth as auth_router
 from .routers import games as games_router
@@ -26,6 +26,7 @@ from .routers import sync as sync_router
 from .scheduler.jobs import build_scheduler
 from .services.igdb import IgdbClient
 from .services.steam import SteamAdapter
+from .services.steamgriddb import SteamGridDbClient
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ def create_app(settings: Settings | None = None, *, enable_scheduler: bool = Tru
     async def lifespan(app: FastAPI):
         async with app.state.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        await migrate(app.state.engine)  # add columns introduced after the initial release
         async with app.state.session_factory() as db:
             await seed_storefronts(db)
             await ensure_password_hash(db, settings.APP_PASSWORD)
@@ -69,6 +71,7 @@ def create_app(settings: Settings | None = None, *, enable_scheduler: bool = Tru
                 app.state.session_factory,
                 app.state.steam_adapter_factory,
                 app.state.igdb_client_factory,
+                app.state.sgdb_client_factory,
             )
             app.state.scheduler.start()
             logger.info("Scheduler started (steam sync every %sh)", settings.SYNC_INTERVAL_HOURS)
@@ -89,6 +92,9 @@ def create_app(settings: Settings | None = None, *, enable_scheduler: bool = Tru
         lambda: IgdbClient(settings.IGDB_CLIENT_ID, settings.IGDB_CLIENT_SECRET)
         if settings.igdb_configured
         else None
+    )
+    app.state.sgdb_client_factory = (
+        lambda: SteamGridDbClient(settings.STEAMGRIDDB_API_KEY) if settings.steamgriddb_configured else None
     )
     app.state.scheduler = None
 

@@ -13,7 +13,9 @@ from ..services.sync_service import sync_storefront
 logger = logging.getLogger(__name__)
 
 
-def build_scheduler(settings, session_factory, steam_adapter_factory, igdb_client_factory) -> AsyncIOScheduler:
+def build_scheduler(
+    settings, session_factory, steam_adapter_factory, igdb_client_factory, sgdb_client_factory=None
+) -> AsyncIOScheduler:
     """Build the scheduler. Steam syncs every SYNC_INTERVAL_HOURS (and once at startup)."""
     scheduler = AsyncIOScheduler()
     if settings.steam_configured:
@@ -22,7 +24,11 @@ def build_scheduler(settings, session_factory, steam_adapter_factory, igdb_clien
             try:
                 async with session_factory() as db:
                     outcome = await sync_storefront(
-                        db, steam_adapter_factory(), igdb_client_factory(), settings.covers_dir
+                        db,
+                        steam_adapter_factory(),
+                        igdb_client_factory(),
+                        settings.covers_dir,
+                        sgdb=sgdb_client_factory() if sgdb_client_factory else None,
                     )
                 logger.info(
                     "Steam sync finished: success=%s items=%s error=%s",

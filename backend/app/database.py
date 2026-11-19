@@ -42,6 +42,28 @@ def make_engine(settings) -> AsyncEngine:  # noqa: ANN001
     return create_async_engine(settings.database_url, echo=False, future=True)
 
 
+# Columns added after the initial release; applied to pre-existing databases.
+GAMES_COLUMN_MIGRATIONS = (
+    ("icon_filename", "VARCHAR(200)"),
+    ("logo_filename", "VARCHAR(200)"),
+)
+
+
+def _migrate_sync(conn) -> None:  # noqa: ANN001
+    from sqlalchemy import text
+
+    cols = {row[1] for row in conn.execute(text("PRAGMA table_info(games)"))}
+    for col, ddl in GAMES_COLUMN_MIGRATIONS:
+        if col not in cols:
+            conn.execute(text(f"ALTER TABLE games ADD COLUMN {col} {ddl}"))
+
+
+async def migrate(engine: AsyncEngine) -> None:
+    """Add any missing columns to existing tables (SQLite has no ALTER COLUMN)."""
+    async with engine.begin() as conn:
+        await conn.run_sync(_migrate_sync)
+
+
 def make_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(engine, expire_on_commit=False)
 

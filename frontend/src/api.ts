@@ -4,6 +4,7 @@ import type {
   GameFilters,
   GamePatchPayload,
   IgdbSearchResult,
+  Meta,
   RecentlyPlayed,
   Session,
   SyncStatus,
@@ -75,6 +76,8 @@ export const api = {
     request<Game>('/api/games', { method: 'POST', body: JSON.stringify(payload) }),
   patchGame: (id: number, payload: GamePatchPayload) =>
     request<Game>(`/api/games/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  refreshAssets: (id: number) => request<Game>(`/api/games/${id}/assets/refresh`, { method: 'POST' }),
+  meta: () => request<Meta>('/api/meta'),
   sessions: (id: number) => request<Session[]>(`/api/games/${id}/sessions`),
   addSession: (id: number, startedAt: string, endedAt: string) =>
     request<Session>(`/api/games/${id}/sessions`, {

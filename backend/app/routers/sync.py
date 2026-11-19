@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 
 from ..database import get_db
-from ..deps import get_igdb_client, get_steam_adapter
+from ..deps import get_igdb_client, get_sgdb_client, get_steam_adapter
 from ..models import Storefront, SyncStatus
 from ..schemas import SyncStatusOut
 from ..services.sync_service import sync_storefront
@@ -45,6 +45,7 @@ async def trigger_steam_sync(
     db=Depends(get_db),
     adapter=Depends(get_steam_adapter),
     igdb=Depends(get_igdb_client),
+    sgdb=Depends(get_sgdb_client),
 ):
     if adapter is None:
         raise HTTPException(
@@ -52,7 +53,7 @@ async def trigger_steam_sync(
             detail="Steam is not configured: set STEAM_API_KEY and STEAM_ID64.",
         )
     settings = request.app.state.settings
-    outcome = await sync_storefront(db, adapter, igdb, settings.covers_dir)
+    outcome = await sync_storefront(db, adapter, igdb, settings.covers_dir, sgdb=sgdb)
     rows = await _status_rows(db)
     for row in rows:
         if row.storefront == outcome.storefront:

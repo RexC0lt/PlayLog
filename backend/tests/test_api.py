@@ -16,10 +16,10 @@ import pytest
 from sqlalchemy import select
 
 from app.config import Settings
-from app.database import Base
-from app.deps import get_igdb_client, get_steam_adapter
+from app.database import Base, migrate
+from app.deps import get_igdb_client, get_sgdb_client, get_steam_adapter
 from app.main import create_app
-from app.models import Game
+from app.models import Game, Ownership, get_or_create_storefront
 from app.services.steam import SteamAdapter
 from app.services.storefront_base import RecentPlay, StorefrontAdapter, StoreGame
 from tests.conftest import TEST_PASSWORD
@@ -307,6 +307,101 @@ async def test_steam_adapter_http_parsing():
     adapter = SteamAdapter("KEY", "7656119", client=client)
     games = await adapter.fetch_library()
     assert games[0].product_id == "620" and games[0].playtime_minutes == 754
+
+
+async def test_meta_endpoint_reports_configured_integrations(auth_client):
+    meta = (await auth_client.get("/api/meta")).json()
+    assert meta == {
+        "steam_configured": False,
+        "igdb_configured": False,
+        "steamgriddb_configured": False,
+    }
+
+
+class FakeSgdb:
+    """Duck-typed SteamGridDB client for the assets-refresh test."""
+
+    async def find_game_by_steam_appid(self, appid):
+        return {"id": 55, "name": "Portal 2"} if appid == "620" else None
+
+    async def search_games(self, term, limit=5):
+        return [{"id": 55, "name": "Portal 2"}]
+
+    async def get_grids(self, gid):
+        return [{"id": 1, "score": 9, "width": 600, "height": 900, "mime": "image/png", "url": "https://cdn/x.png"}]
+
+    async def get_icons(self, gid):
+        return [{"id": 2, "score": 5, "mime": "image/png", "url": "https://cdn/i.png"}]
+
+    async def get_logos(self, gid):
+        return [{"id": 3, "score": 5, "mime": "image/png", "url": "https://cdn/l.png"}]
+
+    async def download(self, url, dest_dir, hint, mime=None):
+        Path(dest_dir).mkdir(parents=True, exist_ok=True)
+        fn = f"{hint}.png"
+        (Path(dest_dir) / fn).write_bytes(b"asset-bytes")
+        return fn
+
+
+async def test_assets_refresh_requires_sgdb(auth_client):
+    game = (await auth_client.post("/api/games", json={"title": "Portal 2"})).json()
+    resp = await auth_client.post(f"/api/games/{game['id']}/assets/refresh")
+    assert resp.status_code == 400
+    assert "STEAMGRIDDB_API_KEY" in resp.json()["detail"]
+
+
+async def test_assets_refresh_fetches_and_serves(app, auth_client):
+    # create a game and give it a steam ownership so refresh matches by appid
+    game = (await auth_client.post("/api/games", json={"title": "Portal 2"})).json()
+    gid = game["id"]
+    async with app.state.session_factory() as db:
+        sf = await get_or_create_storefront(db, "steam")
+        db.add(Ownership(game_id=gid, storefront_id=sf.id, store_product_id="620"))
+        await db.commit()
+
+    app.dependency_overrides[get_sgdb_client] = lambda: FakeSgdb()
+    try:
+        resp = await auth_client.post(f"/api/games/{gid}/assets/refresh")
+        assert resp.status_code == 200, resp.text
+        g = resp.json()
+        assert g["cover_url"] == f"/api/games/{gid}/cover"
+        assert g["icon_url"] == f"/api/games/{gid}/icon"
+        assert g["logo_url"] == f"/api/games/{gid}/logo"
+        assert (await auth_client.get(f"/api/games/{gid}/cover")).content == b"asset-bytes"
+        assert (await auth_client.get(f"/api/games/{gid}/icon")).status_code == 200
+        assert (await auth_client.get(f"/api/games/{gid}/logo")).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_icon_logo_404_without_assets(auth_client):
+    game = (await auth_client.post("/api/games", json={"title": "Bare Game"})).json()
+    assert (await auth_client.get(f"/api/games/{game['id']}/icon")).status_code == 404
+    assert (await auth_client.get(f"/api/games/{game['id']}/logo")).status_code == 404
+
+
+async def test_migrate_adds_asset_columns_to_existing_db():
+    """Simulate a DB created before icon_filename/logo_filename existed."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "CREATE TABLE games (id INTEGER PRIMARY KEY, title VARCHAR(300), igdb_id INTEGER, "
+                "description TEXT, cover_filename VARCHAR(200), release_year INTEGER, genres VARCHAR(500), "
+                "status VARCHAR(20), notes TEXT, rating INTEGER, tags VARCHAR(500), created_at DATETIME)"
+            )
+        )
+    await migrate(engine)
+    async with engine.connect() as conn:
+        cols = {r[1] for r in (await conn.execute(text("PRAGMA table_info(games)"))).all()}
+    assert {"icon_filename", "logo_filename"} <= cols
+    await engine.dispose()
 
 
 async def test_data_persists_across_restarts(tmp_path):

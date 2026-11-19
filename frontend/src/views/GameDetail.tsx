@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
-import type { BacklogStatus, Game, Session } from '../types'
+import type { BacklogStatus, Game, Meta, Session } from '../types'
 import { BACKLOG_STATUSES } from '../types'
 import { formatDateTime, formatPlaytime, statusLabel } from '../utils'
 
@@ -12,6 +12,9 @@ export default function GameDetail() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [meta, setMeta] = useState<Meta | null>(null)
+  const [artBusy, setArtBusy] = useState(false)
+  const [artMsg, setArtMsg] = useState<string | null>(null)
 
   // editable fields
   const [status, setStatus] = useState<BacklogStatus>('unplayed')
@@ -39,8 +42,23 @@ export default function GameDetail() {
 
   useEffect(() => {
     load()
+    api.meta().then(setMeta).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId])
+
+  const refreshArt = async () => {
+    setArtBusy(true)
+    setArtMsg(null)
+    try {
+      const updated = await api.refreshAssets(gameId)
+      setGame(updated)
+      setArtMsg('Art refreshed from SteamGridDB.')
+    } catch (e) {
+      setArtMsg(e instanceof Error ? e.message : 'Art refresh failed')
+    } finally {
+      setArtBusy(false)
+    }
+  }
 
   const save = async () => {
     setSaved(false)
@@ -80,7 +98,19 @@ export default function GameDetail() {
           {game.cover_url ? <img src={game.cover_url} alt={game.title} /> : <div className="cover-placeholder big">{game.title.charAt(0).toUpperCase()}</div>}
         </div>
         <div className="detail-head-info">
-          <h1>{game.title}</h1>
+          {game.logo_url && <img className="detail-logo" src={game.logo_url} alt="" />}
+          <h1>
+            {game.icon_url && <img className="detail-icon" src={game.icon_url} alt="" />}
+            {game.title}
+          </h1>
+          {meta?.steamgriddb_configured && (
+            <div className="actions">
+              <button className="btn small" onClick={refreshArt} disabled={artBusy}>
+                {artBusy ? 'Fetching…' : 'Fetch art from SteamGridDB'}
+              </button>
+              {artMsg && <span className="muted">{artMsg}</span>}
+            </div>
+          )}
           <div className="meta-row">
             {game.release_year && <span>{game.release_year}</span>}
             {game.genres.map((g) => (

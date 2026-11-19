@@ -78,6 +78,7 @@ All configuration comes from the environment (a `.env` file next to
 | `STEAM_ID64` | for Steam sync | — | Your 64-bit Steam ID. |
 | `IGDB_CLIENT_ID` | for IGDB enrichment | — | Twitch dev app client ID (used for IGDB). |
 | `IGDB_CLIENT_SECRET` | for IGDB enrichment | — | Twitch dev app client secret. |
+| `STEAMGRIDDB_API_KEY` | for SteamGridDB art | — | Bearer key for the SteamGridDB API v2. |
 
 `DATA_DIR` (default `/data` in the container) is where `playlog.db` and `covers/`
 live — always the bind-mounted volume, so existing OMV backup jobs cover them.
@@ -106,6 +107,28 @@ in memory. IGDB is used for cover art, description, genres and release year, and
 match Steam app IDs to IGDB games via the `external_games` endpoint (falling back to
 title search). If IGDB is not configured, everything still works — games are just
 added without metadata, and covers can be enriched later.
+
+### SteamGridDB — cover art, icons and logos
+
+Set `STEAMGRIDDB_API_KEY` (get a Bearer key at
+<https://www.steamgriddb.com/profile/preferences/api>) to additionally fetch, per
+game:
+
+- **cover grid** (prefers 600×900) → cached and served at `GET /api/games/{id}/cover`
+- **icon** → `GET /api/games/{id}/icon` (shown as a small overlay on library cards)
+- **logo** → `GET /api/games/{id}/logo` (shown on the game detail page)
+
+Behaviour:
+
+- During Steam sync and when adding a game manually, missing assets are fetched
+  automatically (matched by Steam appid when known, otherwise by title search).
+- On the game detail page, **"Fetch art from SteamGridDB"** re-downloads all three
+  (`POST /api/games/{id}/assets/refresh`), overwriting the cached files.
+- Files are stored once in `data/covers/` as `sgdb_grid_*.png`, `sgdb_icon_*`,
+  `sgdb_logo_*` and served locally afterwards — remote images are never proxied.
+- SteamGridDB failures are best-effort: they are logged, never fail a sync, and the
+  game simply keeps its existing art. Mind the free-tier rate limits of your API key;
+  the automatic fetch only runs for games that are missing assets.
 
 ### Tailscale
 
@@ -151,7 +174,10 @@ All `/api/*` routes except `POST /api/auth/login` require a session (cookie or
 | `GET /api/games?search=&storefront=&status=&tag=` | list games with aggregates |
 | `POST /api/games` | manual entry, optionally `{igdb_id}` for IGDB enrichment |
 | `GET/PATCH /api/games/{id}` | read / update status, notes, rating, tags, title |
-| `GET /api/games/{id}/cover` | locally cached cover image |
+| `GET /api/games/{id}/cover` | locally cached cover image (IGDB or SteamGridDB) |
+| `GET /api/games/{id}/icon`, `GET /api/games/{id}/logo` | locally cached SteamGridDB icon / logo |
+| `POST /api/games/{id}/assets/refresh` | re-fetch cover/icon/logo from SteamGridDB |
+| `GET /api/meta` | which integrations are configured (steam / igdb / steamgriddb) |
 | `GET/POST /api/games/{id}/sessions` | play sessions (manual logging) |
 | `GET /api/igdb/search?q=` | IGDB title search for the add-game picker |
 | `GET /api/sync/status` | last sync result per storefront |

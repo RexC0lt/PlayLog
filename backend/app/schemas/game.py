@@ -40,6 +40,10 @@ class GameOut(BaseModel):
     description: str | None = None
     cover_url: str | None = None  # local cached cover endpoint
     cover_filename: str | None = None
+    icon_url: str | None = None  # local cached SteamGridDB icon
+    logo_url: str | None = None  # local cached SteamGridDB logo
+    icon_filename: str | None = None
+    logo_filename: str | None = None
     release_year: int | None = None
     genres: list[str] = []
     status: BacklogStatusLiteral

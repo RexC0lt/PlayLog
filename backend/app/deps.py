@@ -1,4 +1,4 @@
-"""Injectable factories so tests can override Steam/IGDB with fakes."""
+"""Injectable factories so tests can override Steam/IGDB/SteamGridDB with fakes."""
 
 from __future__ import annotations
 
@@ -11,3 +11,7 @@ def get_steam_adapter(request: Request):
 
 def get_igdb_client(request: Request):
     return request.app.state.igdb_client_factory()
+
+
+def get_sgdb_client(request: Request):
+    return request.app.state.sgdb_client_factory()

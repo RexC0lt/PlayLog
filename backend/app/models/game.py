@@ -26,6 +26,9 @@ class Game(Base):
     igdb_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_filename: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # optional SteamGridDB assets (cached in the same covers/ dir)
+    icon_filename: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    logo_filename: Mapped[str | None] = mapped_column(String(200), nullable=True)
     release_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     genres: Mapped[str | None] = mapped_column(String(500), nullable=True)  # comma-separated
 

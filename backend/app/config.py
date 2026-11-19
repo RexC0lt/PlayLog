@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     STEAM_ID64: str = ""
     IGDB_CLIENT_ID: str = ""
     IGDB_CLIENT_SECRET: str = ""
+    STEAMGRIDDB_API_KEY: str = ""
 
     @property
     def database_url(self) -> str:
@@ -46,6 +47,10 @@ class Settings(BaseSettings):
     @property
     def igdb_configured(self) -> bool:
         return bool(self.IGDB_CLIENT_ID and self.IGDB_CLIENT_SECRET)
+
+    @property
+    def steamgriddb_configured(self) -> bool:
+        return bool(self.STEAMGRIDDB_API_KEY)
 
 
 @lru_cache

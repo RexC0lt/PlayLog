@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import utcnow
 from ..models import Game, Ownership, PlaySession, Storefront, SyncStatus, get_or_create_storefront
+from .assets import fetch_game_assets
 from .covers import cache_cover
 from .igdb import game_fields
 from .matching import normalize_title, pick_best_igdb_match
@@ -218,6 +219,7 @@ async def sync_storefront(
     adapter: StorefrontAdapter,
     igdb,
     covers_dir: Path,
+    sgdb=None,
 ) -> SyncOutcome:
     """Sync one storefront. Never raises: failures are recorded in sync_status."""
     name = adapter.name
@@ -241,6 +243,12 @@ async def sync_storefront(
         for item in library:
             game = await _resolve_game(db, item, storefront, adapter, igdb, covers_dir)
             await _upsert_ownership(db, game, storefront, item, recent_by_product.get(item.product_id))
+            if sgdb is not None and (
+                not game.cover_filename or not game.icon_filename or not game.logo_filename
+            ):
+                # best-effort SteamGridDB art (fills only what is missing); steam product id = appid
+                steam_appid = item.product_id if adapter.name == "steam" else None
+                await fetch_game_assets(game, sgdb, covers_dir, steam_appid=steam_appid, overwrite=False)
             count += 1
         await db.commit()
     except Exception as exc:  # noqa: BLE001
