@@ -89,7 +89,7 @@ async def fetch_game_assets(
         gid = int(sgdb_game["id"])
         await _fetch_one(game, "cover_filename", lambda: sgdb.get_grids(gid), sgdb.download, covers_dir, "grid", overwrite, result)
         # icons: prefer png over ico; logos: png/webp only
-        await _fetch_one(game, "icon_filename", lambda: sgdb.get_icons(gid), sgdb.download, covers_dir, "icon", overwrite, result, prefer_mimes=("image/png", "image/vnd.microsoft.icon", "image/x-icon"))
+        await _fetch_one(game, "icon_filename", lambda: sgdb.get_icons(gid), sgdb.download, covers_dir, "icon", overwrite, result, prefer_mimes=("image/png", "image/vnd.microsoft.icon"))
         await _fetch_one(game, "logo_filename", lambda: sgdb.get_logos(gid), sgdb.download, covers_dir, "logo", overwrite, result)
     except Exception as exc:  # noqa: BLE001 - asset fetching must never break anything
         logger.warning("SteamGridDB asset fetch failed for %r: %s", game.title, exc)

@@ -92,11 +92,13 @@ class SteamGridDbClient:
         return _unwrap(payload, "grids")
 
     async def get_icons(self, game_id: int) -> list[dict]:
-        # NOTE: the icons endpoint only accepts image/png, image/x-icon and
-        # image/vnd.microsoft.icon as mimes (webp is rejected with HTTP 400).
+        # NOTE: the icons endpoint only accepts image/png and
+        # image/vnd.microsoft.icon as mimes — image/webp AND image/x-icon are
+        # rejected with HTTP 400 "Invalid mime type" (verified against several
+        # working open-source clients).
         payload = await self._get(
             f"/icons/game/{game_id}",
-            params={"mimes": "image/png,image/x-icon,image/vnd.microsoft.icon", "types": "static"},
+            params={"mimes": "image/png,image/vnd.microsoft.icon", "types": "static"},
         )
         return _unwrap(payload, "icons")
 

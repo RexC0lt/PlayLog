@@ -25,12 +25,9 @@ def rich_handler(request: httpx.Request) -> httpx.Response:
     assert request.headers["Authorization"] == "Bearer TEST-KEY"
     mimes = request.url.params.get("mimes", "")
     if "/icons/" in path:
-        # regression guard: icons reject image/webp with HTTP 400 "Invalid mime type"
-        assert "webp" not in mimes and set(mimes.split(",")) <= {
-            "image/png",
-            "image/x-icon",
-            "image/vnd.microsoft.icon",
-        }, mimes
+        # regression guard: icons reject image/webp and image/x-icon with
+        # HTTP 400 "Invalid mime type"; only png + vnd.microsoft.icon are valid
+        assert set(mimes.split(",")) == {"image/png", "image/vnd.microsoft.icon"}, mimes
     if "/logos/" in path:
         # regression guard: logos reject image/svg+xml with HTTP 400
         assert "svg" not in mimes and set(mimes.split(",")) <= {"image/png", "image/webp"}, mimes
