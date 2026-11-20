@@ -404,6 +404,60 @@ async def test_migrate_adds_asset_columns_to_existing_db():
     await engine.dispose()
 
 
+async def test_sorting(app, auth_client):
+    from datetime import datetime, timezone
+
+    # Beta: 1h played, 2001, RPG | Alpha: 10h played, 1999, Action | Gamma: no playtime/year/genre
+    beta = (await auth_client.post("/api/games", json={"title": "Beta", "tags": ["x"]})).json()
+    alpha = (await auth_client.post("/api/games", json={"title": "Alpha"})).json()
+    gamma = (await auth_client.post("/api/games", json={"title": "Gamma"})).json()
+    await auth_client.patch(f"/api/games/{beta['id']}", json={"rating": 5})
+    # playtime via manual sessions
+    await auth_client.post(
+        f"/api/games/{beta['id']}/sessions",
+        json={
+            "started_at": datetime(2024, 1, 1, 20, tzinfo=timezone.utc).isoformat(),
+            "ended_at": datetime(2024, 1, 1, 21, tzinfo=timezone.utc).isoformat(),
+        },
+    )
+    await auth_client.post(
+        f"/api/games/{alpha['id']}/sessions",
+        json={
+            "started_at": datetime(2024, 1, 1, 20, tzinfo=timezone.utc).isoformat(),
+            "ended_at": datetime(2024, 1, 2, 6, tzinfo=timezone.utc).isoformat(),
+        },
+    )
+    # set year/genres directly through the DB (they are IGDB/Steam-managed fields)
+    async with app.state.session_factory() as db:
+        from app.models import Game as GameModel
+
+        g = await db.get(GameModel, beta["id"])
+        g.release_year = 2001
+        g.genres = "RPG"
+        g = await db.get(GameModel, alpha["id"])
+        g.release_year = 1999
+        g.genres = "Action"
+        await db.commit()
+
+    async def titles(sort):
+        r = await auth_client.get("/api/games", params={"sort": sort})
+        assert r.status_code == 200
+        return [g["title"] for g in r.json()]
+
+    assert await titles("title") == ["Alpha", "Beta", "Gamma"]
+    assert await titles("title_desc") == ["Gamma", "Beta", "Alpha"]
+    assert await titles("playtime") == ["Alpha", "Beta", "Gamma"]  # most played first
+    assert await titles("playtime_asc") == ["Gamma", "Beta", "Alpha"]
+    assert await titles("year") == ["Beta", "Alpha", "Gamma"]  # newest first, unknown last
+    assert await titles("year_asc") == ["Alpha", "Beta", "Gamma"]
+    assert await titles("genre") == ["Alpha", "Beta", "Gamma"]  # Action, RPG, none last
+    assert await titles("genre_desc") == ["Beta", "Alpha", "Gamma"]
+    assert await titles("recent") == ["Alpha", "Beta", "Gamma"]  # last played desc
+
+    bad = await auth_client.get("/api/games", params={"sort": "bogus"})
+    assert bad.status_code == 400
+
+
 async def test_manual_title_edit(auth_client):
     game = (await auth_client.post("/api/games", json={"title": "Old Name"})).json()
     resp = await auth_client.patch(f"/api/games/{game['id']}", json={"title": "New Name"})

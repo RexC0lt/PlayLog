@@ -20,7 +20,7 @@ from ..schemas import (
 from ..services.assets import fetch_game_assets
 from ..services.covers import cache_cover, cover_file
 from ..services.igdb import game_fields
-from ..services.library import build_game_outs, load_games
+from ..services.library import SORT_KEYS, build_game_outs, load_games, sort_game_outs
 
 router = APIRouter(prefix="/api/games", tags=["games"])
 
@@ -31,10 +31,14 @@ async def list_games(
     storefront: str | None = None,
     status: str | None = None,
     tag: str | None = None,
+    sort: str | None = None,
     db=Depends(get_db),
 ):
+    if sort is not None and sort not in SORT_KEYS:
+        raise HTTPException(status_code=400, detail=f"sort must be one of {sorted(SORT_KEYS)}")
     games = await load_games(db, search=search, storefront=storefront, status=status, tag=tag)
-    return await build_game_outs(db, games)
+    outs = await build_game_outs(db, games)
+    return sort_game_outs(outs, sort or "title")
 
 
 @router.post("", response_model=GameOut, status_code=201)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +34,48 @@ async def load_games(
     stmt = stmt.order_by(Game.title.asc()).distinct()
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+SORT_KEYS = {
+    "title",
+    "title_desc",
+    "playtime",  # most played first
+    "playtime_asc",
+    "recent",  # last played, most recent first
+    "year",  # newest first
+    "year_asc",
+    "genre",
+    "genre_desc",
+}
+
+
+def sort_game_outs(outs: list[GameOut], sort: str = "title") -> list[GameOut]:
+    """Sort game list output; games without a value go last (except where noted)."""
+    if sort == "title":
+        return sorted(outs, key=lambda g: g.title.lower())
+    if sort == "title_desc":
+        return sorted(outs, key=lambda g: g.title.lower(), reverse=True)
+    if sort == "playtime":
+        return sorted(outs, key=lambda g: g.total_playtime_minutes, reverse=True)
+    if sort == "playtime_asc":
+        return sorted(outs, key=lambda g: g.total_playtime_minutes)
+    if sort == "recent":
+        epoch = datetime.min.replace(tzinfo=timezone.utc)
+        return sorted(outs, key=lambda g: g.last_played_at or epoch, reverse=True)
+    if sort == "year":
+        return sorted(outs, key=lambda g: (g.release_year is None, -(g.release_year or 0)))
+    if sort == "year_asc":
+        return sorted(outs, key=lambda g: (g.release_year is None, g.release_year or 0))
+    if sort == "genre":
+        return sorted(outs, key=lambda g: (not g.genres, g.genres[0].lower() if g.genres else "", g.title.lower()))
+    if sort == "genre_desc":
+        with_genre = [g for g in outs if g.genres]
+        without = [g for g in outs if not g.genres]
+        return (
+            sorted(with_genre, key=lambda g: g.genres[0].lower(), reverse=True)
+            + sorted(without, key=lambda g: g.title.lower())
+        )
+    return outs
 
 
 async def build_game_outs(db: AsyncSession, games: list[Game]) -> list[GameOut]:

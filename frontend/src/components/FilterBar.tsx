@@ -1,5 +1,5 @@
 import type { GameFilters } from '../types'
-import { BACKLOG_STATUSES } from '../types'
+import { BACKLOG_STATUSES, SORT_OPTIONS } from '../types'
 
 interface Props {
   filters: GameFilters
@@ -40,6 +40,13 @@ export default function FilterBar({ filters, storefronts, tags, onChange }: Prop
         {tags.map((t) => (
           <option key={t} value={t}>
             {t}
+          </option>
+        ))}
+      </select>
+      <select value={filters.sort} onChange={(e) => set({ sort: e.target.value })} className="input" title="Sort by">
+        {SORT_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            Sort: {o.label}
           </option>
         ))}
       </select>

@@ -91,7 +91,20 @@ export interface GameFilters {
   storefront: string
   status: string
   tag: string
+  sort: string
 }
+
+export const SORT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'title', label: 'Title A–Z' },
+  { value: 'title_desc', label: 'Title Z–A' },
+  { value: 'playtime', label: 'Most played' },
+  { value: 'playtime_asc', label: 'Least played' },
+  { value: 'recent', label: 'Recently played' },
+  { value: 'year', label: 'Newest first' },
+  { value: 'year_asc', label: 'Oldest first' },
+  { value: 'genre', label: 'Genre A–Z' },
+  { value: 'genre_desc', label: 'Genre Z–A' },
+]
 
 export interface Meta {
   steam_configured: boolean

@@ -5,7 +5,7 @@ import GameCard from '../components/GameCard'
 import RecentlyPlayed from '../components/RecentlyPlayed'
 import type { Game, GameFilters, RecentlyPlayed as RP, SyncStatus } from '../types'
 
-const EMPTY_FILTERS: GameFilters = { search: '', storefront: '', status: '', tag: '' }
+const EMPTY_FILTERS: GameFilters = { search: '', storefront: '', status: '', tag: '', sort: 'title' }
 
 export default function Dashboard() {
   const [filters, setFilters] = useState<GameFilters>(EMPTY_FILTERS)

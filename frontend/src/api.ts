@@ -70,6 +70,7 @@ export const api = {
           storefront: filters.storefront,
           status: filters.status,
           tag: filters.tag,
+          sort: filters.sort,
         })
     ),
   game: (id: number) => request<Game>(`/api/games/${id}`),
