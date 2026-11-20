@@ -1,4 +1,5 @@
 import type {
+  AssetKind,
   Game,
   GameCreatePayload,
   GameFilters,
@@ -77,6 +78,23 @@ export const api = {
   patchGame: (id: number, payload: GamePatchPayload) =>
     request<Game>(`/api/games/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   refreshAssets: (id: number) => request<Game>(`/api/games/${id}/assets/refresh`, { method: 'POST' }),
+  uploadAsset: async (id: number, kind: AssetKind, file: File) => {
+    const res = await fetch(`/api/games/${id}/assets/${kind}`, {
+      method: 'PUT',
+      credentials: 'include',
+      body: file,
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    })
+    if (res.status === 401) window.location.href = '/login'
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`
+      try { detail = (await res.json()).detail ?? detail } catch { /* ignore */ }
+      throw new ApiError(detail, res.status)
+    }
+    return (await res.json()) as Game
+  },
+  deleteAsset: (id: number, kind: AssetKind) =>
+    request<Game>(`/api/games/${id}/assets/${kind}`, { method: 'DELETE' }),
   meta: () => request<Meta>('/api/meta'),
   sessions: (id: number) => request<Session[]>(`/api/games/${id}/sessions`),
   addSession: (id: number, startedAt: string, endedAt: string) =>

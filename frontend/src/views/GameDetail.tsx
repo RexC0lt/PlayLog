@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
-import type { BacklogStatus, Game, Meta, Session } from '../types'
+import type { AssetKind, BacklogStatus, Game, Meta, Session } from '../types'
 import { BACKLOG_STATUSES } from '../types'
 import { formatDateTime, formatPlaytime, statusLabel } from '../utils'
 
@@ -17,6 +17,7 @@ export default function GameDetail() {
   const [artMsg, setArtMsg] = useState<string | null>(null)
 
   // editable fields
+  const [title, setTitle] = useState('')
   const [status, setStatus] = useState<BacklogStatus>('unplayed')
   const [rating, setRating] = useState<string>('')
   const [tags, setTags] = useState('')
@@ -30,6 +31,7 @@ export default function GameDetail() {
     try {
       const g = await api.game(gameId)
       setGame(g)
+      setTitle(g.title)
       setStatus(g.status)
       setRating(g.rating === null ? '' : String(g.rating))
       setTags(g.tags.join(', '))
@@ -63,6 +65,7 @@ export default function GameDetail() {
   const save = async () => {
     setSaved(false)
     const payload: Parameters<typeof api.patchGame>[1] = {
+      title: title.trim(),
       status,
       notes: notes.trim() === '' ? null : notes,
       rating: rating === '' ? null : Number(rating),
@@ -75,6 +78,38 @@ export default function GameDetail() {
     setGame(updated)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  // manual artwork upload / clear
+  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
+  const [uploadBusy, setUploadBusy] = useState<string | null>(null)
+  const [artError, setArtError] = useState<string | null>(null)
+
+  const uploadArt = async (kind: AssetKind) => {
+    const file = fileInputs.current[kind]?.files?.[0]
+    if (!file) return
+    setUploadBusy(kind)
+    setArtError(null)
+    try {
+      setGame(await api.uploadAsset(gameId, kind, file))
+    } catch (e) {
+      setArtError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploadBusy(null)
+      if (fileInputs.current[kind]) fileInputs.current[kind]!.value = ''
+    }
+  }
+
+  const clearArt = async (kind: AssetKind) => {
+    setUploadBusy(kind)
+    setArtError(null)
+    try {
+      setGame(await api.deleteAsset(gameId, kind))
+    } catch (e) {
+      setArtError(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setUploadBusy(null)
+    }
   }
 
   const addSession = async () => {
@@ -133,8 +168,56 @@ export default function GameDetail() {
       </div>
 
       <section className="panel">
+        <h2>Artwork</h2>
+        <p className="muted">
+          Upload your own cover, icon or logo (max 10 MB). Uploads are stored in <code>data/covers/</code> and served
+          locally. SteamGridDB art is fetched automatically on sync — use the button above to re-fetch it.
+        </p>
+        {artError && <div className="banner error">{artError}</div>}
+        <div className="artwork-grid">
+          {(
+            [
+              { kind: 'cover' as AssetKind, url: game.cover_url, label: 'Cover (portrait)' },
+              { kind: 'icon' as AssetKind, url: game.icon_url, label: 'Icon' },
+              { kind: 'logo' as AssetKind, url: game.logo_url, label: 'Logo' },
+            ]
+          ).map(({ kind, url, label }) => (
+            <div className="artwork-slot" key={kind}>
+              <div className={`artwork-preview artwork-${kind}`}>
+                {url ? <img src={url} alt={label} /> : <span className="muted">none</span>}
+              </div>
+              <div className="artwork-controls">
+                <strong>{label}</strong>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={(el) => {
+                    fileInputs.current[kind] = el
+                  }}
+                />
+                <div className="actions">
+                  <button className="btn small" onClick={() => uploadArt(kind)} disabled={uploadBusy !== null}>
+                    {uploadBusy === kind ? 'Uploading…' : 'Upload'}
+                  </button>
+                  {url && (
+                    <button className="btn small ghost" onClick={() => clearArt(kind)} disabled={uploadBusy !== null}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel">
         <h2>My metadata</h2>
         <div className="form-grid">
+          <label>
+            Title
+            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
           <label>
             Backlog status
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as BacklogStatus)}>

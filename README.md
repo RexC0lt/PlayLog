@@ -177,6 +177,11 @@ All `/api/*` routes except `POST /api/auth/login` require a session (cookie or
 | `GET /api/games/{id}/cover` | locally cached cover image (IGDB or SteamGridDB) |
 | `GET /api/games/{id}/icon`, `GET /api/games/{id}/logo` | locally cached SteamGridDB icon / logo |
 | `POST /api/games/{id}/assets/refresh` | re-fetch cover/icon/logo from SteamGridDB |
+| `PUT /api/games/{id}/assets/{kind}` | upload a custom `cover`/`icon`/`logo` (raw image body, ≤10 MB) |
+| `DELETE /api/games/{id}/assets/{kind}` | clear a cached asset |
+
+`PATCH /api/games/{id}` also accepts `title`, so titles can be edited manually from
+the game detail page (the "Artwork" panel there handles uploads/clears).
 | `GET /api/meta` | which integrations are configured (steam / igdb / steamgriddb) |
 | `GET/POST /api/games/{id}/sessions` | play sessions (manual logging) |
 | `GET /api/igdb/search?q=` | IGDB title search for the add-game picker |

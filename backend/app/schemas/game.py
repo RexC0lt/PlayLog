@@ -66,7 +66,7 @@ class GameCreate(BaseModel):
 
 
 class GamePatch(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=300)
+    title: str | None = Field(default=None, min_length=1, max_length=300)  # manual title edit
     status: BacklogStatusLiteral | None = None
     notes: str | None = None
     rating: int | None = Field(default=None, ge=0, le=10)

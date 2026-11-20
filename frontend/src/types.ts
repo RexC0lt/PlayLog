@@ -98,3 +98,5 @@ export interface Meta {
   igdb_configured: boolean
   steamgriddb_configured: boolean
 }
+
+export type AssetKind = 'cover' | 'icon' | 'logo'

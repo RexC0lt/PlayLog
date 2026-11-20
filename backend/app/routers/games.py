@@ -118,7 +118,74 @@ def _media_type(path) -> str:  # noqa: ANN001
         ".svg": "image/svg+xml",
         ".ico": "image/x-icon",
         ".webp": "image/webp",
+        ".gif": "image/gif",
     }.get(path.suffix.lower(), "image/jpeg")
+
+
+#: asset kinds that can be uploaded/replaced manually
+ASSET_KINDS = {"cover": "cover_filename", "icon": "icon_filename", "logo": "logo_filename"}
+
+#: content-type -> file extension for manual uploads
+UPLOAD_EXTS = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/svg+xml": ".svg",
+    "image/x-icon": ".ico",
+    "image/vnd.microsoft.icon": ".ico",
+}
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+@router.put("/{game_id}/assets/{kind}", response_model=GameOut)
+async def upload_asset(game_id: int, kind: str, request: Request, db=Depends(get_db)):
+    """Replace one artwork asset (cover/icon/logo) with a manually uploaded image.
+
+    Raw request body = image bytes; Content-Type must be an image/* type.
+    """
+    attr = ASSET_KINDS.get(kind)
+    if attr is None:
+        raise HTTPException(status_code=400, detail=f"kind must be one of {sorted(ASSET_KINDS)}")
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    ext = UPLOAD_EXTS.get(content_type)
+    if ext is None:
+        raise HTTPException(status_code=415, detail=f"Unsupported content type {content_type!r}; upload an image (png/jpeg/webp/gif/svg/ico).")
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="Empty body")
+    if len(body) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Image too large (max 10 MB)")
+    game = await db.get(Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    settings = request.app.state.settings
+    settings.covers_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"manual_{kind}_{game_id}{ext}"
+    (settings.covers_dir / filename).write_bytes(body)
+    setattr(game, attr, filename)
+    await db.commit()
+    return (await build_game_outs(db, [game]))[0]
+
+
+@router.delete("/{game_id}/assets/{kind}", response_model=GameOut)
+async def delete_asset(game_id: int, kind: str, request: Request, db=Depends(get_db)):
+    """Clear a cached artwork asset (cover/icon/logo)."""
+    attr = ASSET_KINDS.get(kind)
+    if attr is None:
+        raise HTTPException(status_code=400, detail=f"kind must be one of {sorted(ASSET_KINDS)}")
+    game = await db.get(Game, game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    old = getattr(game, attr)
+    setattr(game, attr, None)
+    if old and old.startswith("manual_"):  # only delete files we created via upload
+        path = cover_file(request.app.state.settings.covers_dir, old)
+        if path is not None:
+            path.unlink(missing_ok=True)
+    await db.commit()
+    return (await build_game_outs(db, [game]))[0]
 
 
 async def _serve_asset(game_id: int, attr: str, request: Request, db) -> FileResponse:

@@ -404,6 +404,45 @@ async def test_migrate_adds_asset_columns_to_existing_db():
     await engine.dispose()
 
 
+async def test_manual_title_edit(auth_client):
+    game = (await auth_client.post("/api/games", json={"title": "Old Name"})).json()
+    resp = await auth_client.patch(f"/api/games/{game['id']}", json={"title": "New Name"})
+    assert resp.status_code == 200 and resp.json()["title"] == "New Name"
+    listing = await auth_client.get("/api/games", params={"search": "new name"})
+    assert [g["title"] for g in listing.json()] == ["New Name"]
+
+
+async def test_manual_asset_upload_and_delete(auth_client):
+    game = (await auth_client.post("/api/games", json={"title": "Art Game"})).json()
+    gid = game["id"]
+
+    # upload a custom cover (raw body, image content-type)
+    png = b"\x89PNG\r\n\x1a\n" + b"fake-png"
+    resp = await auth_client.put(
+        f"/api/games/{gid}/assets/cover", content=png, headers={"Content-Type": "image/png"}
+    )
+    assert resp.status_code == 200, resp.text
+    g = resp.json()
+    assert g["cover_filename"].startswith(f"manual_cover_{gid}")
+    assert g["cover_url"] == f"/api/games/{gid}/cover"
+    served = await auth_client.get(f"/api/games/{gid}/cover")
+    assert served.status_code == 200 and served.content == png
+
+    # upload icon + logo too
+    for kind, ctype in (("icon", "image/x-icon"), ("logo", "image/svg+xml")):
+        r = await auth_client.put(f"/api/games/{gid}/assets/{kind}", content=b"x", headers={"Content-Type": ctype})
+        assert r.status_code == 200 and r.json()[f"{kind}_url"] == f"/api/games/{gid}/{kind}"
+
+    # bad content type -> 415; bad kind -> 400
+    assert (await auth_client.put(f"/api/games/{gid}/assets/cover", content=b"x", headers={"Content-Type": "text/plain"})).status_code == 415
+    assert (await auth_client.put(f"/api/games/{gid}/assets/banner", content=b"x", headers={"Content-Type": "image/png"})).status_code == 400
+
+    # delete clears the field and the file; cover then 404s
+    r = await auth_client.delete(f"/api/games/{gid}/assets/cover")
+    assert r.status_code == 200 and r.json()["cover_url"] is None
+    assert (await auth_client.get(f"/api/games/{gid}/cover")).status_code == 404
+
+
 async def test_data_persists_across_restarts(tmp_path):
     """A second app instance on the same DATA_DIR sees the first instance's data."""
     data_dir = tmp_path / "data"
