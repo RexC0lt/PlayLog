@@ -122,6 +122,11 @@ Behaviour:
 
 - During Steam sync and when adding a game manually, missing assets are fetched
   automatically (matched by Steam appid when known, otherwise by title search).
+
+Genres come from IGDB when available; when IGDB has none for a synced Steam game,
+they are filled from Steam's keyless public store API
+(`store.steampowered.com/api/appdetails?filters=genres`, one request per game,
+best-effort — rate-limited or failing responses just leave genres empty).
 - On the game detail page, **"Fetch art from SteamGridDB"** re-downloads all three
   (`POST /api/games/{id}/assets/refresh`), overwriting the cached files.
 - Files are stored once in `data/covers/` as `sgdb_grid_*.png`, `sgdb_icon_*`,

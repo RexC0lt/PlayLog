@@ -268,6 +268,15 @@ async def _sync_storefront_locked(
         for item in library:
             game = await _resolve_game(db, item, storefront, adapter, igdb, covers_dir)
             await _upsert_ownership(db, game, storefront, item, recent_by_product.get(item.product_id))
+            if not game.genres:
+                # fill genres from the storefront itself when IGDB had none (best-effort)
+                try:
+                    store_genres = await adapter.fetch_store_genres(item.product_id)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Store genre lookup for %s failed: %s", item.product_id, exc)
+                    store_genres = []
+                if store_genres:
+                    game.genres = ", ".join(store_genres)
             if sgdb is not None and (
                 not game.cover_filename or not game.icon_filename or not game.logo_filename
             ):

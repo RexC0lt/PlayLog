@@ -14,6 +14,8 @@ import httpx
 from .storefront_base import RecentPlay, StorefrontAdapter, StorefrontError, StoreGame
 
 STEAM_API_BASE = "https://api.steampowered.com"
+#: keyless public store API (appdetails) — used for genres/categories/tags
+STEAM_STORE_BASE = "https://store.steampowered.com"
 #: IGDB external_game_category id for Steam appids
 STEAM_IGDB_CATEGORY = 1
 
@@ -43,6 +45,15 @@ def parse_owned_games(response: dict) -> list[StoreGame]:
             )
         )
     return [g for g in out if g.product_id and g.title]
+
+
+def parse_store_appdetails(payload: dict, appid: str) -> list[str]:
+    """Extract genre descriptions from a store.steampowered.com/api/appdetails response."""
+    entry = payload.get(str(appid)) or {}
+    if not entry.get("success"):
+        return []
+    data = entry.get("data") or {}
+    return [g["description"] for g in (data.get("genres") or []) if g.get("description")]
 
 
 def parse_recently_played(response: dict) -> list[RecentPlay]:
@@ -106,3 +117,26 @@ class SteamAdapter(StorefrontAdapter):
             {"key": self.api_key, "steamid": self.steam_id64, "format": "json"},
         )
         return parse_recently_played(response)
+
+    async def fetch_store_genres(self, appid: str) -> list[str]:
+        """Genres for one app from the keyless public store API (appdetails).
+
+        Best-effort: any failure (incl. rate limiting) yields [] so a sync never breaks.
+        """
+        try:
+            if self._client is not None:
+                resp = await self._client.get(
+                    f"{STEAM_STORE_BASE}/api/appdetails",
+                    params={"appids": str(appid), "filters": "genres"},
+                )
+            else:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.get(
+                        f"{STEAM_STORE_BASE}/api/appdetails",
+                        params={"appids": str(appid), "filters": "genres"},
+                    )
+            if resp.status_code != 200:
+                return []
+            return parse_store_appdetails(resp.json(), str(appid))
+        except Exception:  # noqa: BLE001 - store metadata is best-effort
+            return []

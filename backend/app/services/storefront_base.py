@@ -55,3 +55,11 @@ class StorefrontAdapter(ABC):
     @abstractmethod
     async def fetch_recently_played(self) -> list[RecentPlay]:
         """Return recently played games. May raise StorefrontError; callers treat it as optional."""
+
+    async def fetch_store_genres(self, product_id: str) -> list[str]:
+        """Store-reported genres for a product, if the storefront exposes them.
+
+        Default: none. The sync uses this to fill game.genres when IGDB had none.
+        Implementations must be best-effort (return [] on any failure).
+        """
+        return []

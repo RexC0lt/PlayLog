@@ -161,6 +161,30 @@ async def test_sync_works_without_igdb(session, tmp_path):
     assert game is not None and game.igdb_id is None and game.cover_filename is None
 
 
+async def test_sync_fills_genres_from_store_when_igdb_has_none(session, tmp_path):
+    """Steam store genres fill game.genres only when IGDB didn't provide any."""
+
+    class GenreAdapter(FakeSteamAdapter):
+        async def fetch_store_genres(self, product_id):
+            return {"620": ["Puzzle", "Platformer"], "400": ["Puzzle"]}.get(product_id, [])
+
+    covers = tmp_path / "covers"
+    # IGDB knows 620 (genres set) but not 400 (no genres) -> only 400 gets store genres
+    igdb = FakeIgdb(covers)
+    del igdb.details[1905]
+    adapter = GenreAdapter(
+        library=[
+            _game(("620", 100), 1_700_000_000),
+            _game(("400", 50), 1_700_000_000),
+        ]
+    )
+    outcome = await sync_storefront(session, adapter, igdb, covers)
+    assert outcome.success
+    games = {g.title: g for g in (await session.execute(select(Game))).scalars().all()}
+    assert games["Portal 2"].genres == "Puzzle"  # from IGDB, untouched
+    assert games["Portal"].genres == "Puzzle"  # from the Steam store API
+
+
 async def test_sync_links_storefront_game_to_existing_manual_game(session, tmp_path):
     """A manual entry whose title matches a synced title gets the ownership attached."""
     manual = Game(title="portal 2")  # normalized-equal to the steam title

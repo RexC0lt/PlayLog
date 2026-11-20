@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import httpx
+
 from app.services.matching import normalize_title, pick_best_igdb_match, title_similarity
-from app.services.steam import parse_owned_games, parse_recently_played
+from app.services.steam import (
+    SteamAdapter,
+    parse_owned_games,
+    parse_recently_played,
+    parse_store_appdetails,
+)
 from app.services.storefront_base import StorefrontError
 
 
@@ -85,3 +92,45 @@ class TestSteamParsing:
         recent = parse_recently_played(payload)
         assert recent[0].product_id == "620"
         assert recent[0].playtime_recent_minutes == 120
+
+
+class TestSteamStoreGenres:
+    def test_parse_store_appdetails(self):
+        payload = {
+            "620": {
+                "success": True,
+                "data": {"genres": [{"id": "3", "description": "Puzzle"}, {"id": "2", "description": "Shooter"}]},
+            }
+        }
+        assert parse_store_appdetails(payload, "620") == ["Puzzle", "Shooter"]
+        # unsuccessful / missing entries yield no genres
+        assert parse_store_appdetails({"620": {"success": False}}, "620") == []
+        assert parse_store_appdetails({}, "620") == []
+
+    async def test_fetch_store_genres_http(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            # store API is keyless — no Authorization header
+            assert "Authorization" not in request.headers
+            assert request.url.host == "store.steampowered.com"
+            assert request.url.params["appids"] == "620"
+            return httpx.Response(
+                200,
+                json={
+                    "620": {
+                        "success": True,
+                        "data": {"genres": [{"id": "3", "description": "Puzzle"}]},
+                    }
+                },
+            )
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = SteamAdapter("KEY", "7656119", client=client)
+        assert await adapter.fetch_store_genres("620") == ["Puzzle"]
+
+    async def test_fetch_store_genres_failure_returns_empty(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(429, text="rate limited")
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        adapter = SteamAdapter("KEY", "7656119", client=client)
+        assert await adapter.fetch_store_genres("620") == []
