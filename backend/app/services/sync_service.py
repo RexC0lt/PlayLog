@@ -278,7 +278,10 @@ async def _sync_storefront_locked(
                 if store_genres:
                     game.genres = ", ".join(store_genres)
             if sgdb is not None and (
-                not game.cover_filename or not game.icon_filename or not game.logo_filename
+                not game.cover_filename
+                or not game.icon_filename
+                or not game.logo_filename
+                or not game.hero_filename
             ):
                 # best-effort SteamGridDB art (fills only what is missing); steam product id = appid
                 steam_appid = item.product_id if adapter.name == "steam" else None

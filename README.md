@@ -115,8 +115,10 @@ Set `STEAMGRIDDB_API_KEY` (get a Bearer key at
 game:
 
 - **cover grid** (prefers 600×900) → cached and served at `GET /api/games/{id}/cover`
-- **icon** → `GET /api/games/{id}/icon` (shown as a small overlay on library cards)
+- **icon** → `GET /api/games/{id}/icon` (shown inline next to the title on library cards)
 - **logo** → `GET /api/games/{id}/logo` (shown on the game detail page)
+- **hero** (wide background, prefers 1920×620) → `GET /api/games/{id}/hero`, used as the
+  background of the game detail header
 
 Behaviour:
 
@@ -129,8 +131,8 @@ they are filled from Steam's keyless public store API
 best-effort — rate-limited or failing responses just leave genres empty).
 - On the game detail page, **"Fetch art from SteamGridDB"** re-downloads all three
   (`POST /api/games/{id}/assets/refresh`), overwriting the cached files.
-- Files are stored once in `data/covers/` as `sgdb_grid_*.png`, `sgdb_icon_*`,
-  `sgdb_logo_*` and served locally afterwards — remote images are never proxied.
+- Files are stored once in `data/covers/` as `sgdb_grid_*`, `sgdb_icon_*`,
+  `sgdb_logo_*`, `sgdb_hero_*` and served locally afterwards — remote images are never proxied.
 - SteamGridDB failures are best-effort: they are logged, never fail a sync, and the
   game simply keeps its existing art. Mind the free-tier rate limits of your API key;
   the automatic fetch only runs for games that are missing assets.
@@ -180,7 +182,7 @@ All `/api/*` routes except `POST /api/auth/login` require a session (cookie or
 | `POST /api/games` | manual entry, optionally `{igdb_id}` for IGDB enrichment |
 | `GET/PATCH /api/games/{id}` | read / update status, notes, rating, tags, title |
 | `GET /api/games/{id}/cover` | locally cached cover image (IGDB or SteamGridDB) |
-| `GET /api/games/{id}/icon`, `GET /api/games/{id}/logo` | locally cached SteamGridDB icon / logo |
+| `GET /api/games/{id}/icon`, `GET /api/games/{id}/logo`, `GET /api/games/{id}/hero` | locally cached SteamGridDB icon / logo / hero |
 | `POST /api/games/{id}/assets/refresh` | re-fetch cover/icon/logo from SteamGridDB |
 | `PUT /api/games/{id}/assets/{kind}` | upload a custom `cover`/`icon`/`logo` (raw image body, ≤10 MB) |
 | `DELETE /api/games/{id}/assets/{kind}` | clear a cached asset |

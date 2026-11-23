@@ -43,14 +43,12 @@ async def _fetch_one(
     overwrite: bool,
     result: dict,
     prefer_mimes: tuple[str, ...] = ("image/png", "image/jpeg", "image/webp"),
+    prefer_dims: tuple[str, ...] | None = None,
 ) -> None:
     try:
         assets = await fetch_assets()
-        best = _pick(
-            assets,
-            prefer_dims=("600x900", "342x482") if kind == "grid" else (),
-            prefer_mimes=prefer_mimes,
-        )
+        dims = prefer_dims if prefer_dims is not None else (("600x900", "342x482") if kind == "grid" else ())
+        best = _pick(assets, prefer_dims=dims, prefer_mimes=prefer_mimes)
         if best is None:
             return
         if not overwrite and getattr(game, attr):
@@ -75,7 +73,7 @@ async def fetch_game_assets(
     overwrite=False only missing assets are filled (used during sync/add);
     overwrite=True replaces them (explicit user "refresh art" action).
     """
-    result = {"grid": None, "icon": None, "logo": None}
+    result = {"grid": None, "icon": None, "logo": None, "hero": None}
     try:
         sgdb_game = None
         if steam_appid:
@@ -91,6 +89,7 @@ async def fetch_game_assets(
         # icons: prefer png over ico; logos: png/webp only
         await _fetch_one(game, "icon_filename", lambda: sgdb.get_icons(gid), sgdb.download, covers_dir, "icon", overwrite, result, prefer_mimes=("image/png", "image/vnd.microsoft.icon"))
         await _fetch_one(game, "logo_filename", lambda: sgdb.get_logos(gid), sgdb.download, covers_dir, "logo", overwrite, result)
+        await _fetch_one(game, "hero_filename", lambda: sgdb.get_heroes(gid), sgdb.download, covers_dir, "hero", overwrite, result, prefer_dims=("1920x620", "3840x1240"))
     except Exception as exc:  # noqa: BLE001 - asset fetching must never break anything
         logger.warning("SteamGridDB asset fetch failed for %r: %s", game.title, exc)
     return result

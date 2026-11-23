@@ -336,6 +336,9 @@ class FakeSgdb:
     async def get_logos(self, gid):
         return [{"id": 3, "score": 5, "mime": "image/png", "url": "https://cdn/l.png"}]
 
+    async def get_heroes(self, gid):
+        return [{"id": 4, "score": 5, "width": 1920, "height": 620, "mime": "image/jpeg", "url": "https://cdn/h.jpg"}]
+
     async def download(self, url, dest_dir, hint, mime=None):
         Path(dest_dir).mkdir(parents=True, exist_ok=True)
         fn = f"{hint}.png"
@@ -367,9 +370,11 @@ async def test_assets_refresh_fetches_and_serves(app, auth_client):
         assert g["cover_url"] == f"/api/games/{gid}/cover"
         assert g["icon_url"] == f"/api/games/{gid}/icon"
         assert g["logo_url"] == f"/api/games/{gid}/logo"
+        assert g["hero_url"] == f"/api/games/{gid}/hero"
         assert (await auth_client.get(f"/api/games/{gid}/cover")).content == b"asset-bytes"
         assert (await auth_client.get(f"/api/games/{gid}/icon")).status_code == 200
         assert (await auth_client.get(f"/api/games/{gid}/logo")).status_code == 200
+        assert (await auth_client.get(f"/api/games/{gid}/hero")).status_code == 200
     finally:
         app.dependency_overrides.clear()
 
@@ -400,7 +405,7 @@ async def test_migrate_adds_asset_columns_to_existing_db():
     await migrate(engine)
     async with engine.connect() as conn:
         cols = {r[1] for r in (await conn.execute(text("PRAGMA table_info(games)"))).all()}
-    assert {"icon_filename", "logo_filename"} <= cols
+    assert {"icon_filename", "logo_filename", "hero_filename"} <= cols
     await engine.dispose()
 
 
@@ -507,8 +512,8 @@ async def test_manual_asset_upload_and_delete(auth_client):
     served = await auth_client.get(f"/api/games/{gid}/cover")
     assert served.status_code == 200 and served.content == png
 
-    # upload icon + logo too
-    for kind, ctype in (("icon", "image/x-icon"), ("logo", "image/svg+xml")):
+    # upload icon + logo + hero too
+    for kind, ctype in (("icon", "image/x-icon"), ("logo", "image/png"), ("hero", "image/jpeg")):
         r = await auth_client.put(f"/api/games/{gid}/assets/{kind}", content=b"x", headers={"Content-Type": ctype})
         assert r.status_code == 200 and r.json()[f"{kind}_url"] == f"/api/games/{gid}/{kind}"
 

@@ -58,6 +58,7 @@ def make_engine(settings) -> AsyncEngine:  # noqa: ANN001
 GAMES_COLUMN_MIGRATIONS = (
     ("icon_filename", "VARCHAR(200)"),
     ("logo_filename", "VARCHAR(200)"),
+    ("hero_filename", "VARCHAR(200)"),
 )
 
 

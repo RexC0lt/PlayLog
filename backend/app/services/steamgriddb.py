@@ -103,6 +103,20 @@ class SteamGridDbClient:
         )
         return _unwrap(payload, "icons")
 
+    async def get_heroes(self, game_id: int) -> list[dict]:
+        """Wide background images; mimes accepted like grids (png/jpeg/webp)."""
+        payload = await self._get(
+            f"/heroes/game/{game_id}",
+            params={
+                "dimensions": "1920x620,3840x1240,1600x620",
+                "mimes": "image/png,image/jpeg,image/webp",
+                "types": "static,animated",
+                "nsfw": "false",
+                "humor": "false",
+            },
+        )
+        return _unwrap(payload, "heroes")
+
     async def get_logos(self, game_id: int) -> list[dict]:
         # NOTE: the logos endpoint only accepts image/png and image/webp
         # (svg is rejected with HTTP 400).

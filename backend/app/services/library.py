@@ -145,8 +145,10 @@ async def build_game_outs(db: AsyncSession, games: list[Game]) -> list[GameOut]:
                 cover_filename=game.cover_filename,
                 icon_url=f"/api/games/{game.id}/icon" if game.icon_filename else None,
                 logo_url=f"/api/games/{game.id}/logo" if game.logo_filename else None,
+                hero_url=f"/api/games/{game.id}/hero" if game.hero_filename else None,
                 icon_filename=game.icon_filename,
                 logo_filename=game.logo_filename,
+                hero_filename=game.hero_filename,
                 release_year=game.release_year,
                 genres=csv_to_list(game.genres),
                 status=game.status,  # type: ignore[arg-type]

@@ -76,7 +76,12 @@ async def create_game(
                             game.cover_filename = filename
             except Exception:
                 pass  # IGDB enrichment is best-effort; the manual entry still works
-    if sgdb is not None and (not game.cover_filename or not game.icon_filename or not game.logo_filename):
+    if sgdb is not None and (
+        not game.cover_filename
+        or not game.icon_filename
+        or not game.logo_filename
+        or not game.hero_filename
+    ):
         # best-effort SteamGridDB art (fills only what is missing)
         await fetch_game_assets(game, sgdb, settings.covers_dir, steam_appid=None, overwrite=False)
     db.add(game)
@@ -128,7 +133,12 @@ def _media_type(path) -> str:  # noqa: ANN001
 
 
 #: asset kinds that can be uploaded/replaced manually
-ASSET_KINDS = {"cover": "cover_filename", "icon": "icon_filename", "logo": "logo_filename"}
+ASSET_KINDS = {
+    "cover": "cover_filename",
+    "icon": "icon_filename",
+    "logo": "logo_filename",
+    "hero": "hero_filename",
+}
 
 #: content-type -> file extension for manual uploads
 UPLOAD_EXTS = {
@@ -219,6 +229,12 @@ async def get_icon(game_id: int, request: Request, db=Depends(get_db)):
 async def get_logo(game_id: int, request: Request, db=Depends(get_db)):
     """Serve the locally cached SteamGridDB logo, if any."""
     return await _serve_asset(game_id, "logo_filename", request, db)
+
+
+@router.get("/{game_id}/hero")
+async def get_hero(game_id: int, request: Request, db=Depends(get_db)):
+    """Serve the locally cached wide hero/background image, if any."""
+    return await _serve_asset(game_id, "hero_filename", request, db)
 
 
 @router.post("/{game_id}/assets/refresh", response_model=GameOut)

@@ -128,7 +128,16 @@ export default function GameDetail() {
       <Link to="/" className="back">
         ← Back to library
       </Link>
-      <div className="detail-header">
+      <div
+        className={`detail-header${game.hero_url ? ' has-hero' : ''}`}
+        style={
+          game.hero_url
+            ? {
+                backgroundImage: `linear-gradient(rgba(15,17,21,0.45), rgba(15,17,21,0.88)), url(${game.hero_url})`,
+              }
+            : undefined
+        }
+      >
         <div className="detail-cover">
           {game.cover_url ? <img src={game.cover_url} alt={game.title} /> : <div className="cover-placeholder big">{game.title.charAt(0).toUpperCase()}</div>}
         </div>
@@ -166,50 +175,6 @@ export default function GameDetail() {
           {game.description && <p className="description">{game.description}</p>}
         </div>
       </div>
-
-      <section className="panel">
-        <h2>Artwork</h2>
-        <p className="muted">
-          Upload your own cover, icon or logo (max 10 MB). Uploads are stored in <code>data/covers/</code> and served
-          locally. SteamGridDB art is fetched automatically on sync — use the button above to re-fetch it.
-        </p>
-        {artError && <div className="banner error">{artError}</div>}
-        <div className="artwork-grid">
-          {(
-            [
-              { kind: 'cover' as AssetKind, url: game.cover_url, label: 'Cover (portrait)' },
-              { kind: 'icon' as AssetKind, url: game.icon_url, label: 'Icon' },
-              { kind: 'logo' as AssetKind, url: game.logo_url, label: 'Logo' },
-            ]
-          ).map(({ kind, url, label }) => (
-            <div className="artwork-slot" key={kind}>
-              <div className={`artwork-preview artwork-${kind}`}>
-                {url ? <img src={url} alt={label} /> : <span className="muted">none</span>}
-              </div>
-              <div className="artwork-controls">
-                <strong>{label}</strong>
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={(el) => {
-                    fileInputs.current[kind] = el
-                  }}
-                />
-                <div className="actions">
-                  <button className="btn small" onClick={() => uploadArt(kind)} disabled={uploadBusy !== null}>
-                    {uploadBusy === kind ? 'Uploading…' : 'Upload'}
-                  </button>
-                  {url && (
-                    <button className="btn small ghost" onClick={() => clearArt(kind)} disabled={uploadBusy !== null}>
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <section className="panel">
         <h2>My metadata</h2>
@@ -336,6 +301,52 @@ export default function GameDetail() {
           <button className="btn" onClick={addSession} disabled={!start || !end}>
             Log manual session
           </button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Artwork</h2>
+        <p className="muted">
+          Upload your own cover, icon, logo or hero (max 10 MB). Uploads are stored in <code>data/covers/</code> and served
+          locally. SteamGridDB art (including the wide hero used as this page's background) is fetched automatically on
+          sync — use the button above to re-fetch it.
+        </p>
+        {artError && <div className="banner error">{artError}</div>}
+        <div className="artwork-grid">
+          {(
+            [
+              { kind: 'cover' as AssetKind, url: game.cover_url, label: 'Cover (portrait)' },
+              { kind: 'icon' as AssetKind, url: game.icon_url, label: 'Icon' },
+              { kind: 'logo' as AssetKind, url: game.logo_url, label: 'Logo' },
+              { kind: 'hero' as AssetKind, url: game.hero_url, label: 'Hero (wide background)' },
+            ]
+          ).map(({ kind, url, label }) => (
+            <div className="artwork-slot" key={kind}>
+              <div className={`artwork-preview artwork-${kind}`}>
+                {url ? <img src={url} alt={label} /> : <span className="muted">none</span>}
+              </div>
+              <div className="artwork-controls">
+                <strong>{label}</strong>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={(el) => {
+                    fileInputs.current[kind] = el
+                  }}
+                />
+                <div className="actions">
+                  <button className="btn small" onClick={() => uploadArt(kind)} disabled={uploadBusy !== null}>
+                    {uploadBusy === kind ? 'Uploading…' : 'Upload'}
+                  </button>
+                  {url && (
+                    <button className="btn small ghost" onClick={() => clearArt(kind)} disabled={uploadBusy !== null}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </div>

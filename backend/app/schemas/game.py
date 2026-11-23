@@ -42,8 +42,10 @@ class GameOut(BaseModel):
     cover_filename: str | None = None
     icon_url: str | None = None  # local cached SteamGridDB icon
     logo_url: str | None = None  # local cached SteamGridDB logo
+    hero_url: str | None = None  # local cached SteamGridDB hero (wide background)
     icon_filename: str | None = None
     logo_filename: str | None = None
+    hero_filename: str | None = None
     release_year: int | None = None
     genres: list[str] = []
     status: BacklogStatusLiteral

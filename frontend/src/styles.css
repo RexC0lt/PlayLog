@@ -300,6 +300,10 @@ textarea.input {
   width: 64px;
   height: 64px;
 }
+.artwork-hero {
+  width: 132px;
+  height: 44px;
+}
 .artwork-controls {
   display: flex;
   flex-direction: column;
@@ -473,6 +477,17 @@ textarea.input {
   gap: 1.2rem;
   margin-bottom: 1.25rem;
   flex-wrap: wrap;
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-left: -1rem;
+  margin-right: -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+.detail-header.has-hero {
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
 }
 .detail-cover {
   width: 180px;

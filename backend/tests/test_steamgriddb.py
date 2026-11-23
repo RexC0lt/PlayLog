@@ -54,7 +54,19 @@ def rich_handler(request: httpx.Request) -> httpx.Response:
     if "/logos/game/123" in path:
         return httpx.Response(
             200,
-            json={"success": True, "data": [{"id": 8, "score": 2, "mime": "image/svg+xml", "url": "https://cdn2.steamgriddb.com/logo/d.svg"}]},
+            json={"success": True, "data": [{"id": 8, "score": 2, "mime": "image/png", "url": "https://cdn2.steamgriddb.com/logo/d.png"}]},
+        )
+    if "/heroes/game/123" in path:
+        mimes = request.url.params.get("mimes", "")
+        assert set(mimes.split(",")) <= {"image/png", "image/jpeg", "image/webp"}, mimes
+        return httpx.Response(
+            200,
+            json={
+                "success": True,
+                "data": [
+                    {"id": 9, "score": 4, "width": 1920, "height": 620, "mime": "image/jpeg", "url": "https://cdn2.steamgriddb.com/hero/h.jpg"}
+                ],
+            },
         )
     return httpx.Response(404, json={"success": False, "errors": ["not found"]})
 
@@ -73,7 +85,9 @@ async def test_search_lookup_assets_and_download(tmp_path):
     icons = await client.get_icons(123)
     assert icons[0]["id"] == 7
     logos = await client.get_logos(123)
-    assert logos[0]["mime"] == "image/svg+xml"
+    assert logos[0]["mime"] == "image/png"
+    heroes = await client.get_heroes(123)
+    assert heroes[0]["width"] == 1920 and heroes[0]["height"] == 620
 
     fn = await client.download(grids[1]["url"], tmp_path, "sgdb_grid_2", grids[1]["mime"])
     assert fn == "sgdb_grid_2.png"

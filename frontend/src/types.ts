@@ -21,8 +21,10 @@ export interface Game {
   cover_filename: string | null
   icon_url: string | null
   logo_url: string | null
+  hero_url: string | null
   icon_filename: string | null
   logo_filename: string | null
+  hero_filename: string | null
   release_year: number | null
   genres: string[]
   status: BacklogStatus
@@ -113,4 +115,4 @@ export interface Meta {
   steamgriddb_configured: boolean
 }
 
-export type AssetKind = 'cover' | 'icon' | 'logo'
+export type AssetKind = 'cover' | 'icon' | 'logo' | 'hero'
