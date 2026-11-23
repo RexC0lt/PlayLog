@@ -31,12 +31,13 @@ async def list_games(
     storefront: str | None = None,
     status: str | None = None,
     tag: str | None = None,
+    genre: str | None = None,
     sort: str | None = None,
     db=Depends(get_db),
 ):
     if sort is not None and sort not in SORT_KEYS:
         raise HTTPException(status_code=400, detail=f"sort must be one of {sorted(SORT_KEYS)}")
-    games = await load_games(db, search=search, storefront=storefront, status=status, tag=tag)
+    games = await load_games(db, search=search, storefront=storefront, status=status, tag=tag, genre=genre)
     outs = await build_game_outs(db, games)
     return sort_game_outs(outs, sort or "title")
 

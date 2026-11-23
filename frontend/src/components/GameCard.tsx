@@ -12,11 +12,13 @@ export default function GameCard({ game }: { game: Game }) {
           <div className="cover-placeholder">{game.title.charAt(0).toUpperCase()}</div>
         )}
         <span className={`status-chip status-${game.status}`}>{statusLabel(game.status)}</span>
-        {game.icon_url && <img className="card-icon" src={game.icon_url} alt="" loading="lazy" />}
       </div>
       <div className="card-body">
-        <div className="card-title" title={game.title}>
-          {game.title}
+        <div className="card-title-row">
+          {game.icon_url && <img className="card-icon-inline" src={game.icon_url} alt="" loading="lazy" />}
+          <div className="card-title" title={game.title}>
+            {game.title}
+          </div>
         </div>
         <div className="badges">
           {game.ownerships.map((o) => (

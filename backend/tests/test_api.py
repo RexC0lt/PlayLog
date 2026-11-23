@@ -458,6 +458,31 @@ async def test_sorting(app, auth_client):
     assert bad.status_code == 400
 
 
+async def test_genre_filter(app, auth_client):
+    ids = {}
+    for title in ("Action RPG Game", "Pure Action", "MMO Thing"):
+        ids[title] = (await auth_client.post("/api/games", json={"title": title})).json()["id"]
+    async with app.state.session_factory() as db:
+        from app.models import Game as GameModel
+
+        genres = {"Action RPG Game": "Action, RPG", "Pure Action": "Action", "MMO Thing": "MMORPG"}
+        for title, g in genres.items():
+            game = await db.get(GameModel, ids[title])
+            game.genres = g
+        await db.commit()
+
+    async def titles(genre):
+        r = await auth_client.get("/api/games", params={"genre": genre})
+        assert r.status_code == 200
+        return sorted(g["title"] for g in r.json())
+
+    assert await titles("Action") == ["Action RPG Game", "Pure Action"]
+    assert await titles("RPG") == ["Action RPG Game"]  # must not match "MMORPG"
+    assert await titles("rpg") == ["Action RPG Game"]  # case-insensitive
+    assert await titles("MMORPG") == ["MMO Thing"]
+    assert await titles("Horror") == []
+
+
 async def test_manual_title_edit(auth_client):
     game = (await auth_client.post("/api/games", json={"title": "Old Name"})).json()
     resp = await auth_client.patch(f"/api/games/{game['id']}", json={"title": "New Name"})

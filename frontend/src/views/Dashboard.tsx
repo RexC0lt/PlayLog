@@ -5,7 +5,7 @@ import GameCard from '../components/GameCard'
 import RecentlyPlayed from '../components/RecentlyPlayed'
 import type { Game, GameFilters, RecentlyPlayed as RP, SyncStatus } from '../types'
 
-const EMPTY_FILTERS: GameFilters = { search: '', storefront: '', status: '', tag: '', sort: 'title' }
+const EMPTY_FILTERS: GameFilters = { search: '', storefront: '', status: '', tag: '', genre: '', sort: 'title' }
 
 export default function Dashboard() {
   const [filters, setFilters] = useState<GameFilters>(EMPTY_FILTERS)
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [statuses, setStatuses] = useState<SyncStatus[]>([])
   const [recent, setRecent] = useState<RP[]>([])
+  const [allGames, setAllGames] = useState<Game[]>([])
 
   // debounce the text search
   useEffect(() => {
@@ -31,17 +32,21 @@ export default function Dashboard() {
   useEffect(() => {
     api.syncStatus().then(setStatuses).catch(() => {})
     api.recentlyPlayed().then(setRecent).catch(() => {})
+    // unfiltered list, only to populate the tag/genre filter dropdowns
+    api.games(EMPTY_FILTERS).then(setAllGames).catch(() => {})
   }, [])
 
-  const storefronts = useMemo(
-    () => statuses.map((s) => s.storefront).filter((s) => s !== 'manual' || true),
-    [statuses]
-  )
+  const storefronts = useMemo(() => statuses.map((s) => s.storefront), [statuses])
   const allTags = useMemo(() => {
     const set = new Set<string>()
-    for (const g of games ?? []) for (const t of g.tags) set.add(t)
+    for (const g of allGames) for (const t of g.tags) set.add(t)
     return [...set].sort()
-  }, [games])
+  }, [allGames])
+  const allGenres = useMemo(() => {
+    const set = new Set<string>()
+    for (const g of allGames) for (const ge of g.genres) set.add(ge)
+    return [...set].sort()
+  }, [allGames])
 
   const steamStatus = statuses.find((s) => s.storefront === 'steam')
 
@@ -56,7 +61,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <FilterBar filters={filters} storefronts={storefronts} tags={allTags} onChange={setFilters} />
+      <FilterBar filters={filters} storefronts={storefronts} tags={allTags} genres={allGenres} onChange={setFilters} />
 
       {error && <div className="banner error">{error}</div>}
       {games === null && !error && <p className="muted">Loading library…</p>}

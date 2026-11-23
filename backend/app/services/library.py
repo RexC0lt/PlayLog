@@ -11,12 +11,30 @@ from ..models import Game, Ownership, PlaySession, Storefront
 from ..schemas import GameOut, OwnershipOut, csv_to_list, list_to_csv  # noqa: F401  (re-export helpers)
 
 
+def _like_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _genre_clause(genre: str):  # noqa: ANN001
+    """Exact membership match on the comma-separated genres string (no substring false positives)."""
+    from sqlalchemy import or_
+
+    g = _like_escape(genre.strip())
+    return or_(
+        Game.genres.ilike(g, escape="\\"),
+        Game.genres.ilike(f"{g}, %", escape="\\"),
+        Game.genres.ilike(f"%, {g}, %", escape="\\"),
+        Game.genres.ilike(f"%, {g}", escape="\\"),
+    )
+
+
 async def load_games(
     db: AsyncSession,
     search: str | None = None,
     storefront: str | None = None,
     status: str | None = None,
     tag: str | None = None,
+    genre: str | None = None,
 ) -> list[Game]:
     stmt = select(Game)
     if search:
@@ -24,7 +42,9 @@ async def load_games(
     if status:
         stmt = stmt.where(Game.status == status)
     if tag:
-        stmt = stmt.where(Game.tags.ilike(f"%{tag}%"))
+        stmt = stmt.where(Game.tags.ilike(f"%{_like_escape(tag)}%", escape="\\"))
+    if genre:
+        stmt = stmt.where(_genre_clause(genre))
     if storefront:
         stmt = (
             stmt.join(Ownership, Ownership.game_id == Game.id)

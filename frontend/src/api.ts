@@ -70,6 +70,7 @@ export const api = {
           storefront: filters.storefront,
           status: filters.status,
           tag: filters.tag,
+          genre: filters.genre,
           sort: filters.sort,
         })
     ),

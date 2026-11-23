@@ -91,6 +91,7 @@ export interface GameFilters {
   storefront: string
   status: string
   tag: string
+  genre: string
   sort: string
 }
 

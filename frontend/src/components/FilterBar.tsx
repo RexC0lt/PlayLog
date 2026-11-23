@@ -5,10 +5,11 @@ interface Props {
   filters: GameFilters
   storefronts: string[]
   tags: string[]
+  genres: string[]
   onChange: (f: GameFilters) => void
 }
 
-export default function FilterBar({ filters, storefronts, tags, onChange }: Props) {
+export default function FilterBar({ filters, storefronts, tags, genres, onChange }: Props) {
   const set = (patch: Partial<GameFilters>) => onChange({ ...filters, ...patch })
   return (
     <div className="filterbar">
@@ -40,6 +41,14 @@ export default function FilterBar({ filters, storefronts, tags, onChange }: Prop
         {tags.map((t) => (
           <option key={t} value={t}>
             {t}
+          </option>
+        ))}
+      </select>
+      <select value={filters.genre} onChange={(e) => set({ genre: e.target.value })} className="input">
+        <option value="">All genres</option>
+        {genres.map((g) => (
+          <option key={g} value={g}>
+            {g}
           </option>
         ))}
       </select>

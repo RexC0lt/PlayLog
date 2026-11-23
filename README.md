@@ -176,7 +176,7 @@ All `/api/*` routes except `POST /api/auth/login` require a session (cookie or
 | `GET /api/health` | public liveness probe (container healthcheck; no auth) |
 | `POST /api/auth/login` | `{password}` → session token (also set as cookie) |
 | `POST /api/auth/logout`, `GET /api/auth/me` | session management |
-| `GET /api/games?search=&storefront=&status=&tag=&sort=` | list games with aggregates; `sort` = `title`, `title_desc`, `playtime`, `playtime_asc`, `recent`, `year`, `year_asc`, `genre`, `genre_desc` (default `title`) |
+| `GET /api/games?search=&storefront=&status=&tag=&genre=&sort=` | list games with aggregates; `genre` matches one entry of the comma-separated genre list exactly (case-insensitive, no substring false positives); `sort` = `title`, `title_desc`, `playtime`, `playtime_asc`, `recent`, `year`, `year_asc`, `genre`, `genre_desc` (default `title`) |
 | `POST /api/games` | manual entry, optionally `{igdb_id}` for IGDB enrichment |
 | `GET/PATCH /api/games/{id}` | read / update status, notes, rating, tags, title |
 | `GET /api/games/{id}/cover` | locally cached cover image (IGDB or SteamGridDB) |
