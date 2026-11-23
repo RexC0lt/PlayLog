@@ -108,7 +108,9 @@ class SteamGridDbClient:
         payload = await self._get(
             f"/heroes/game/{game_id}",
             params={
-                "dimensions": "1920x620,3840x1240,1600x620",
+                # valid hero dimensions are exactly 1920x620, 3840x1240, 1600x650
+                # (anything else -> HTTP 400 "Invalid asset dimensions specified")
+                "dimensions": "1920x620,3840x1240,1600x650",
                 "mimes": "image/png,image/jpeg,image/webp",
                 "types": "static,animated",
                 "nsfw": "false",

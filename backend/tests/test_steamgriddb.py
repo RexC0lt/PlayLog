@@ -59,6 +59,10 @@ def rich_handler(request: httpx.Request) -> httpx.Response:
     if "/heroes/game/123" in path:
         mimes = request.url.params.get("mimes", "")
         assert set(mimes.split(",")) <= {"image/png", "image/jpeg", "image/webp"}, mimes
+        # regression guard: only 1920x620, 3840x1240 and 1600x650 are valid hero
+        # dimensions ("1600x620" etc. -> HTTP 400 "Invalid asset dimensions specified")
+        dims = request.url.params.get("dimensions", "")
+        assert set(dims.split(",")) <= {"1920x620", "3840x1240", "1600x650"}, dims
         return httpx.Response(
             200,
             json={
